@@ -19,14 +19,18 @@ import { AttachmentTray } from './AttachmentTray';
 interface HomeworkCardProps {
   assignment: Assignment;
   isStaffUnlocked?: boolean;
+  isAdminUnlocked?: boolean;
   onDeleteAssignment?: (id: string) => void;
+  onRequestAdminDelete?: (id: string) => void;
   onPreviewFile?: (file: HomeworkFile) => void;
 }
 
 export const HomeworkCard: React.FC<HomeworkCardProps> = ({
   assignment,
   isStaffUnlocked = false,
+  isAdminUnlocked = false,
   onDeleteAssignment,
+  onRequestAdminDelete,
   onPreviewFile,
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
@@ -92,11 +96,17 @@ export const HomeworkCard: React.FC<HomeworkCardProps> = ({
               )}
             </div>
 
-            {/* Staff Delete Button if staff unlocked */}
-            {isStaffUnlocked && onDeleteAssignment && (
+            {/* Admin Delete Button */}
+            {onDeleteAssignment && (
               <button
-                onClick={() => onDeleteAssignment(assignment.id)}
-                title="Delete Assignment (Staff Action)"
+                onClick={() => {
+                  if (onRequestAdminDelete && !isAdminUnlocked) {
+                    onRequestAdminDelete(assignment.id);
+                  } else {
+                    onDeleteAssignment(assignment.id);
+                  }
+                }}
+                title="Delete Assignment (Admin PIN Required)"
                 className="text-rose-600 hover:text-rose-800 p-1.5 rounded-xl hover:bg-rose-100/80 transition-colors"
               >
                 <Trash2 className="w-4 h-4" />

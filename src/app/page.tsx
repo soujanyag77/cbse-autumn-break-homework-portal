@@ -6,6 +6,7 @@ import { Hero } from '@/components/Hero';
 import { FilterBar } from '@/components/FilterBar';
 import { HomeworkCard } from '@/components/HomeworkCard';
 import { TeacherUploadModal } from '@/components/TeacherUploadModal';
+import { AdminPinModal } from '@/components/AdminPinModal';
 import { FilePreviewModal } from '@/components/FilePreviewModal';
 import { SupabaseSchemaModal } from '@/components/SupabaseSchemaModal';
 import { Footer } from '@/components/Footer';
@@ -42,6 +43,10 @@ export default function Home() {
     sortBy: 'due_date_asc',
   });
 
+  const [isAdminUnlocked, setIsAdminUnlocked] = useState(false);
+  const [isAdminModalOpen, setIsAdminModalOpen] = useState(false);
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+
   // Load Assignments on Mount
   const loadData = async () => {
     setIsLoading(true);
@@ -60,9 +65,21 @@ export default function Home() {
     loadData();
   }, []);
 
-  // Staff PIN Unlock (Default Teacher PIN: 102026)
+  // Teacher PIN Unlock (PIN: 102026) or Admin PIN (PIN: 992026)
   const handleUnlockStaff = (pin: string): boolean => {
-    if (pin.trim() === '102026') {
+    const trimmed = pin.trim();
+    if (trimmed === '102026' || trimmed === '992026') {
+      setIsStaffUnlocked(true);
+      if (trimmed === '992026') setIsAdminUnlocked(true);
+      return true;
+    }
+    return false;
+  };
+
+  // Admin PIN Unlock (PIN: 992026)
+  const handleUnlockAdmin = (pin: string): boolean => {
+    if (pin.trim() === '992026') {
+      setIsAdminUnlocked(true);
       setIsStaffUnlocked(true);
       return true;
     }
@@ -71,6 +88,7 @@ export default function Home() {
 
   const handleLockStaff = () => {
     setIsStaffUnlocked(false);
+    setIsAdminUnlocked(false);
   };
 
   // Open Staff Room Tab
@@ -87,7 +105,6 @@ export default function Home() {
       subject: 'All Subjects',
       searchQuery: '',
     }));
-    // Scroll down smoothly to assignments section
     const el = document.getElementById('assignments-section');
     if (el) {
       el.scrollIntoView({ behavior: 'smooth' });
@@ -95,9 +112,18 @@ export default function Home() {
   };
 
   const handleDelete = async (id: string) => {
-    if (confirm('Are you sure you want to delete this assignment?')) {
+    if (confirm('Are you sure you want to delete this assignment upload?')) {
       await deleteAssignment(id);
       setAssignments((prev) => prev.filter((a) => a.id !== id));
+    }
+  };
+
+  const handleRequestAdminDelete = (id: string) => {
+    if (isAdminUnlocked) {
+      handleDelete(id);
+    } else {
+      setPendingDeleteId(id);
+      setIsAdminModalOpen(true);
     }
   };
 
@@ -211,7 +237,9 @@ export default function Home() {
                 key={item.id}
                 assignment={item}
                 isStaffUnlocked={isStaffUnlocked}
+                isAdminUnlocked={isAdminUnlocked}
                 onDeleteAssignment={handleDelete}
+                onRequestAdminDelete={handleRequestAdminDelete}
                 onPreviewFile={(file) => setPreviewFile(file)}
               />
             ))}
@@ -255,6 +283,23 @@ export default function Home() {
         onUnlockStaff={handleUnlockStaff}
         onAssignmentCreated={handleAssignmentCreated}
         onSwitchToStudentView={() => setActiveTab('student')}
+      />
+
+      <AdminPinModal
+        isOpen={isAdminModalOpen}
+        onClose={() => {
+          setIsAdminModalOpen(false);
+          setPendingDeleteId(null);
+        }}
+        onUnlockAdmin={handleUnlockAdmin}
+        onSuccess={() => {
+          if (pendingDeleteId) {
+            handleDelete(pendingDeleteId);
+            setPendingDeleteId(null);
+          }
+        }}
+        title="Admin Authorization Required"
+        description="Please enter the Admin Security PIN to delete this assignment upload requested by the teacher."
       />
 
       <FilePreviewModal
