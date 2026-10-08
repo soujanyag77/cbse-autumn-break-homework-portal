@@ -54,10 +54,6 @@ export const TeacherUploadModal: React.FC<TeacherUploadModalProps> = ({
   onAssignmentCreated,
   onSwitchToStudentView,
 }) => {
-  // PIN Form state
-  const [pinInput, setPinInput] = useState('');
-  const [pinError, setPinError] = useState('');
-
   // Form Fields state
   const [teacherName, setTeacherName] = useState('');
   const [teacherPhone, setTeacherPhone] = useState('');
@@ -86,15 +82,7 @@ export const TeacherUploadModal: React.FC<TeacherUploadModalProps> = ({
 
   if (!isOpen) return null;
 
-  // Handle PIN verification
-  const handlePinSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (onUnlockStaff(pinInput)) {
-      setPinError('');
-    } else {
-      setPinError('Invalid Staff PIN! (Default demo PIN is 2026)');
-    }
-  };
+
 
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value.replace(/\D/g, '');
@@ -208,54 +196,8 @@ export const TeacherUploadModal: React.FC<TeacherUploadModalProps> = ({
           </button>
         </div>
 
-        {/* Modal Body: If Locked vs Unlocked */}
-        {!isStaffUnlocked ? (
-          /* STAFF PIN LOCK STEP */
-          <div className="p-6 sm:p-10 text-center max-w-md mx-auto space-y-5">
-            <div className="w-16 h-16 rounded-3xl bg-amber-100 text-amber-800 flex items-center justify-center mx-auto border border-amber-300 shadow-inner">
-              <Lock className="w-8 h-8 text-amber-700" />
-            </div>
-
-            <div>
-              <h4 className="text-xl font-black text-slate-900">Staff PIN Protection</h4>
-              <p className="text-xs text-slate-600 mt-1 font-medium">
-                Please enter the 4-digit Staff Security PIN to access assignment submission form.
-              </p>
-              <div className="mt-2 inline-flex items-center space-x-1 text-[11px] font-bold text-amber-800 bg-amber-100 px-2.5 py-1 rounded-full border border-amber-300">
-                <ShieldCheck className="w-3.5 h-3.5 text-amber-700" />
-                <span>Demo Demo PIN: <strong>2026</strong></span>
-              </div>
-            </div>
-
-            <form onSubmit={handlePinSubmit} className="space-y-4">
-              <div>
-                <input
-                  type="password"
-                  maxLength={4}
-                  value={pinInput}
-                  onChange={(e) => setPinInput(e.target.value)}
-                  placeholder="Enter 4-Digit PIN"
-                  className="w-full text-center text-2xl tracking-[0.5em] font-mono py-3 bg-white border border-amber-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-amber-500 font-bold"
-                  autoFocus
-                />
-                {pinError && (
-                  <p className="text-xs font-bold text-rose-600 mt-2 flex items-center justify-center gap-1">
-                    <AlertCircle className="w-3.5 h-3.5" />
-                    {pinError}
-                  </p>
-                )}
-              </div>
-
-              <button
-                type="submit"
-                className="w-full bg-gradient-to-r from-amber-700 to-orange-600 hover:from-amber-800 hover:to-orange-700 text-white font-black py-3 rounded-2xl shadow-md transition-all text-sm flex items-center justify-center space-x-2"
-              >
-                <Unlock className="w-4 h-4" />
-                <span>Unlock Teacher Portal</span>
-              </button>
-            </form>
-          </div>
-        ) : submittedAssignment ? (
+        {/* Modal Body: Success State vs Submission Form */}
+        {submittedAssignment ? (
           /* SUCCESS CONFIRMATION STATE */
           <div className="p-8 text-center space-y-5">
             <div className="w-16 h-16 rounded-3xl bg-emerald-100 text-emerald-800 flex items-center justify-center mx-auto border border-emerald-300 shadow-md">

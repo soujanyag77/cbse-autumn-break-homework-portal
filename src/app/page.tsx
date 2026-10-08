@@ -25,7 +25,7 @@ import {
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState<'student' | 'teacher'>('student');
-  const [isStaffUnlocked, setIsStaffUnlocked] = useState(false);
+  const [isStaffUnlocked, setIsStaffUnlocked] = useState(true);
   const [isTeacherModalOpen, setIsTeacherModalOpen] = useState(false);
   const [isSchemaModalOpen, setIsSchemaModalOpen] = useState(false);
   const [previewFile, setPreviewFile] = useState<HomeworkFile | null>(null);

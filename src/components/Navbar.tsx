@@ -37,11 +37,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   totalAssignmentsCount,
 }) => {
   const handleTeacherTabClick = () => {
-    if (!isStaffUnlocked) {
-      onOpenPinModal();
-    } else {
-      setActiveTab('teacher');
-    }
+    setActiveTab('teacher');
+    onOpenPinModal();
   };
 
   return (
@@ -103,34 +100,11 @@ export const Navbar: React.FC<NavbarProps> = ({
             >
               <GraduationCap className="w-4 h-4" />
               <span>Teacher Staff Room</span>
-              {isStaffUnlocked ? (
-                <span className="flex items-center text-[10px] bg-emerald-800 text-white px-1.5 py-0.5 rounded-md uppercase font-black">
-                  <Unlock className="w-3 h-3 mr-0.5" /> PIN OK
-                </span>
-              ) : (
-                <Lock className="w-3.5 h-3.5 text-amber-600" />
-              )}
             </button>
           </nav>
 
           {/* Right Action Tools */}
           <div className="flex items-center space-x-2 sm:space-x-3">
-            {/* Supabase Status / Schema Modal Trigger */}
-            <button
-              onClick={onOpenSchemaModal}
-              title={isSupabaseLive ? 'Connected to Supabase DB' : 'Using Local Storage Fallback Mode. Click for SQL Schema setup.'}
-              className={`flex items-center space-x-1 px-2.5 py-1.5 rounded-xl text-xs font-semibold border transition-all ${
-                isSupabaseLive
-                  ? 'bg-emerald-50 text-emerald-800 border-emerald-300 hover:bg-emerald-100'
-                  : 'bg-amber-50 text-amber-800 border-amber-300 hover:bg-amber-100'
-              }`}
-            >
-              <Database className="w-3.5 h-3.5 text-amber-600" />
-              <span className="hidden lg:inline">
-                {isSupabaseLive ? 'Supabase Live' : 'Local Storage Mode'}
-              </span>
-              <FileCode2 className="w-3 h-3 ml-0.5 opacity-70" />
-            </button>
 
             {/* Print Action */}
             <button
@@ -176,7 +150,6 @@ export const Navbar: React.FC<NavbarProps> = ({
           >
             <GraduationCap className="w-4 h-4" />
             <span>Teacher Upload</span>
-            {!isStaffUnlocked && <Lock className="w-3 h-3 text-amber-500" />}
           </button>
         </div>
 
