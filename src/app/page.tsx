@@ -25,7 +25,7 @@ import {
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState<'student' | 'teacher'>('student');
-  const [isStaffUnlocked, setIsStaffUnlocked] = useState(true);
+  const [isStaffUnlocked, setIsStaffUnlocked] = useState(false);
   const [isTeacherModalOpen, setIsTeacherModalOpen] = useState(false);
   const [isSchemaModalOpen, setIsSchemaModalOpen] = useState(false);
   const [previewFile, setPreviewFile] = useState<HomeworkFile | null>(null);
@@ -60,9 +60,9 @@ export default function Home() {
     loadData();
   }, []);
 
-  // Staff PIN Unlock (Default Demo PIN: 2026)
+  // Staff PIN Unlock (Default Teacher PIN: 102026)
   const handleUnlockStaff = (pin: string): boolean => {
-    if (pin.trim() === '2026') {
+    if (pin.trim() === '102026') {
       setIsStaffUnlocked(true);
       return true;
     }

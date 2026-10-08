@@ -54,6 +54,10 @@ export const TeacherUploadModal: React.FC<TeacherUploadModalProps> = ({
   onAssignmentCreated,
   onSwitchToStudentView,
 }) => {
+  // PIN Form state
+  const [pinInput, setPinInput] = useState('');
+  const [pinError, setPinError] = useState('');
+
   // Form Fields state
   const [teacherName, setTeacherName] = useState('');
   const [teacherPhone, setTeacherPhone] = useState('');
@@ -81,6 +85,16 @@ export const TeacherUploadModal: React.FC<TeacherUploadModalProps> = ({
   }, [selectedClass]);
 
   if (!isOpen) return null;
+
+  // Handle PIN verification
+  const handlePinSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (onUnlockStaff(pinInput)) {
+      setPinError('');
+    } else {
+      setPinError('Invalid Teacher PIN. Access denied.');
+    }
+  };
 
 
 
@@ -196,8 +210,50 @@ export const TeacherUploadModal: React.FC<TeacherUploadModalProps> = ({
           </button>
         </div>
 
-        {/* Modal Body: Success State vs Submission Form */}
-        {submittedAssignment ? (
+        {/* Modal Body: If Locked vs Unlocked */}
+        {!isStaffUnlocked ? (
+          /* TEACHER PIN LOGIN STEP */
+          <div className="p-6 sm:p-10 text-center max-w-md mx-auto space-y-5">
+            <div className="w-16 h-16 rounded-3xl bg-amber-100 text-amber-800 flex items-center justify-center mx-auto border border-amber-300 shadow-inner">
+              <Lock className="w-8 h-8 text-amber-700" />
+            </div>
+
+            <div>
+              <h4 className="text-xl font-black text-slate-900">Teacher Staff Authentication</h4>
+              <p className="text-xs text-slate-600 mt-1 font-medium">
+                Please enter the Teacher Security PIN to access the homework upload form.
+              </p>
+            </div>
+
+            <form onSubmit={handlePinSubmit} className="space-y-4">
+              <div>
+                <input
+                  type="password"
+                  maxLength={6}
+                  value={pinInput}
+                  onChange={(e) => setPinInput(e.target.value)}
+                  placeholder="Enter Security PIN"
+                  className="w-full text-center text-2xl tracking-[0.4em] font-mono py-3 bg-white border border-amber-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-amber-500 font-bold"
+                  autoFocus
+                />
+                {pinError && (
+                  <p className="text-xs font-bold text-rose-600 mt-2 flex items-center justify-center gap-1">
+                    <AlertCircle className="w-3.5 h-3.5" />
+                    {pinError}
+                  </p>
+                )}
+              </div>
+
+              <button
+                type="submit"
+                className="w-full bg-gradient-to-r from-amber-700 to-orange-600 hover:from-amber-800 hover:to-orange-700 text-white font-black py-3 rounded-2xl shadow-md transition-all text-sm flex items-center justify-center space-x-2"
+              >
+                <Unlock className="w-4 h-4" />
+                <span>Verify & Continue</span>
+              </button>
+            </form>
+          </div>
+        ) : submittedAssignment ? (
           /* SUCCESS CONFIRMATION STATE */
           <div className="p-8 text-center space-y-5">
             <div className="w-16 h-16 rounded-3xl bg-emerald-100 text-emerald-800 flex items-center justify-center mx-auto border border-emerald-300 shadow-md">
