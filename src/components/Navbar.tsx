@@ -11,13 +11,16 @@ import {
   Sparkles,
   School,
   FileCode2,
+  ShieldCheck,
 } from 'lucide-react';
 
 interface NavbarProps {
   activeTab: 'student' | 'teacher';
   setActiveTab: (tab: 'student' | 'teacher') => void;
   isStaffUnlocked: boolean;
+  isAdminUnlocked: boolean;
   onOpenPinModal: () => void;
+  onOpenAdminDashboard: () => void;
   onLockStaff: () => void;
   isSupabaseLive: boolean;
   onOpenSchemaModal: () => void;
@@ -29,7 +32,9 @@ export const Navbar: React.FC<NavbarProps> = ({
   activeTab,
   setActiveTab,
   isStaffUnlocked,
+  isAdminUnlocked,
   onOpenPinModal,
+  onOpenAdminDashboard,
   onLockStaff,
   isSupabaseLive,
   onOpenSchemaModal,
@@ -100,6 +105,14 @@ export const Navbar: React.FC<NavbarProps> = ({
             >
               <GraduationCap className="w-4 h-4" />
               <span>Teacher Staff Room</span>
+            </button>
+
+            <button
+              onClick={onOpenAdminDashboard}
+              className="flex items-center space-x-2 px-4 py-2 rounded-xl text-sm font-bold text-rose-900/80 hover:text-rose-950 hover:bg-white/50 transition-all"
+            >
+              <ShieldCheck className="w-4 h-4 text-rose-700" />
+              <span>Admin Dashboard</span>
             </button>
           </nav>
 

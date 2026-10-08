@@ -7,6 +7,7 @@ import { FilterBar } from '@/components/FilterBar';
 import { HomeworkCard } from '@/components/HomeworkCard';
 import { TeacherUploadModal } from '@/components/TeacherUploadModal';
 import { AdminPinModal } from '@/components/AdminPinModal';
+import { AdminDashboardModal } from '@/components/AdminDashboardModal';
 import { FilePreviewModal } from '@/components/FilePreviewModal';
 import { SupabaseSchemaModal } from '@/components/SupabaseSchemaModal';
 import { Footer } from '@/components/Footer';
@@ -45,6 +46,7 @@ export default function Home() {
 
   const [isAdminUnlocked, setIsAdminUnlocked] = useState(false);
   const [isAdminModalOpen, setIsAdminModalOpen] = useState(false);
+  const [isAdminDashboardOpen, setIsAdminDashboardOpen] = useState(false);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
 
   // Load Assignments on Mount
@@ -91,9 +93,18 @@ export default function Home() {
     setIsAdminUnlocked(false);
   };
 
-  // Open Staff Room Tab
+  // Open Teacher Staff Room Tab
   const handleOpenTeacherRoom = () => {
     setIsTeacherModalOpen(true);
+  };
+
+  // Open Admin Control Dashboard
+  const handleOpenAdminDashboard = () => {
+    if (isAdminUnlocked) {
+      setIsAdminDashboardOpen(true);
+    } else {
+      setIsAdminModalOpen(true);
+    }
   };
 
   // Handle Quick Jump from Hero
@@ -197,7 +208,9 @@ export default function Home() {
           if (tab === 'teacher') setIsTeacherModalOpen(true);
         }}
         isStaffUnlocked={isStaffUnlocked}
+        isAdminUnlocked={isAdminUnlocked}
         onOpenPinModal={() => setIsTeacherModalOpen(true)}
+        onOpenAdminDashboard={handleOpenAdminDashboard}
         onLockStaff={handleLockStaff}
         isSupabaseLive={isSupabaseLive}
         onOpenSchemaModal={() => setIsSchemaModalOpen(true)}
@@ -293,13 +306,22 @@ export default function Home() {
         }}
         onUnlockAdmin={handleUnlockAdmin}
         onSuccess={() => {
+          setIsAdminDashboardOpen(true);
           if (pendingDeleteId) {
             handleDelete(pendingDeleteId);
             setPendingDeleteId(null);
           }
         }}
         title="Admin Authorization Required"
-        description="Please enter the Admin Security PIN to delete this assignment upload requested by the teacher."
+        description="Please enter the Admin Security PIN to access Admin Control Dashboard and delete assignment uploads."
+      />
+
+      <AdminDashboardModal
+        isOpen={isAdminDashboardOpen}
+        onClose={() => setIsAdminDashboardOpen(false)}
+        assignments={assignments}
+        onDeleteAssignment={handleDelete}
+        onOpenUpload={() => setIsTeacherModalOpen(true)}
       />
 
       <FilePreviewModal
