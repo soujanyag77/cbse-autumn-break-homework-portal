@@ -70,9 +70,15 @@ export default function Home() {
   // Teacher PIN Unlock (PIN: 102026) or Admin PIN (PIN: 992026)
   const handleUnlockStaff = (pin: string): boolean => {
     const trimmed = pin.trim();
-    if (trimmed === '102026' || trimmed === '992026') {
+    if (trimmed === '102026') {
       setIsStaffUnlocked(true);
-      if (trimmed === '992026') setIsAdminUnlocked(true);
+      return true;
+    }
+    if (trimmed === '992026') {
+      setIsStaffUnlocked(true);
+      setIsAdminUnlocked(true);
+      setIsTeacherModalOpen(false);
+      setIsAdminDashboardOpen(true);
       return true;
     }
     return false;
@@ -83,6 +89,8 @@ export default function Home() {
     if (pin.trim() === '992026') {
       setIsAdminUnlocked(true);
       setIsStaffUnlocked(true);
+      setIsTeacherModalOpen(false);
+      setIsAdminDashboardOpen(true);
       return true;
     }
     return false;
@@ -294,6 +302,8 @@ export default function Home() {
         onClose={() => setIsTeacherModalOpen(false)}
         isStaffUnlocked={isStaffUnlocked}
         onUnlockStaff={handleUnlockStaff}
+        onUnlockAdmin={handleUnlockAdmin}
+        onOpenAdminDashboard={handleOpenAdminDashboard}
         onAssignmentCreated={handleAssignmentCreated}
         onSwitchToStudentView={() => setActiveTab('student')}
       />
@@ -338,6 +348,7 @@ export default function Home() {
       {/* 6. Footer */}
       <Footer
         onOpenTeacherRoom={handleOpenTeacherRoom}
+        onOpenAdminDashboard={handleOpenAdminDashboard}
         onOpenSchemaModal={() => setIsSchemaModalOpen(true)}
       />
 

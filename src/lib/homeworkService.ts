@@ -1,22 +1,32 @@
 import { Assignment, HomeworkFile } from '@/types/homework';
 import { INITIAL_MOCK_ASSIGNMENTS } from './mockData';
-import { supabase, isSupabaseConfigured } from './supabase';
+import { getSupabaseClient, getSupabaseCredentials } from './supabase';
+import {
+  getAssignmentsFromIdb,
+  saveAssignmentToIdb,
+  saveAllAssignmentsToIdb,
+  deleteAssignmentFromIdb,
+} from './indexedDbStorage';
 
 const LOCAL_STORAGE_KEY = 'cbse_autumn_homework_assignments_v1';
 
 export async function fetchAssignments(): Promise<{ assignments: Assignment[]; isFromSupabase: boolean }> {
-  if (isSupabaseConfigured && supabase) {
+  const client = getSupabaseClient();
+  const { isConfigured } = getSupabaseCredentials();
+
+  // 1. Try Supabase Cloud Database first (Shared across all devices)
+  if (isConfigured && client) {
     try {
-      const { data: assignmentsData, error: assignError } = await supabase
+      const { data: assignmentsData, error: assignError } = await client
         .from('assignments')
         .select('*')
         .order('created_at', { ascending: false });
 
       if (assignError) throw assignError;
 
-      if (assignmentsData) {
-        // Fetch files for each assignment
-        const { data: filesData } = await supabase
+      if (assignmentsData && assignmentsData.length > 0) {
+        // Fetch files for assignments
+        const { data: filesData } = await client
           .from('assignment_files')
           .select('*');
 
@@ -52,20 +62,31 @@ export async function fetchAssignments(): Promise<{ assignments: Assignment[]; i
           is_verified_staff: true,
         }));
 
+        // Cache into IndexedDB for instant load on refresh
+        await saveAllAssignmentsToIdb(formattedAssignments);
+
         return { assignments: formattedAssignments, isFromSupabase: true };
       }
     } catch (err) {
-      console.warn('Supabase fetch failed, falling back to local storage mock data:', err);
+      console.warn('Supabase fetch failed, checking IndexedDB cache:', err);
     }
   }
 
-  // Fallback to localStorage / initial mock
+  // 2. Read from IndexedDB (Persistent across page reloads without 5MB quota limit)
   if (typeof window !== 'undefined') {
+    const idbData = await getAssignmentsFromIdb();
+    if (idbData && idbData.length > 0) {
+      return { assignments: idbData, isFromSupabase: false };
+    }
+
+    // 3. Check legacy localStorage fallback
     const cached = localStorage.getItem(LOCAL_STORAGE_KEY);
     if (cached) {
       try {
         const parsed = JSON.parse(cached);
         if (Array.isArray(parsed) && parsed.length > 0) {
+          // Migrate to IndexedDB
+          await saveAllAssignmentsToIdb(parsed);
           return { assignments: parsed, isFromSupabase: false };
         }
       } catch (e) {
@@ -73,8 +94,13 @@ export async function fetchAssignments(): Promise<{ assignments: Assignment[]; i
       }
     }
 
-    // Initialize with mock data if none exists
-    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(INITIAL_MOCK_ASSIGNMENTS));
+    // 4. First run: Initialize IndexedDB with default mock data
+    await saveAllAssignmentsToIdb(INITIAL_MOCK_ASSIGNMENTS);
+    try {
+      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(INITIAL_MOCK_ASSIGNMENTS));
+    } catch (e) {
+      // Ignore if localStorage quota exceeded
+    }
   }
 
   return { assignments: INITIAL_MOCK_ASSIGNMENTS, isFromSupabase: false };
@@ -88,89 +114,48 @@ export async function saveAssignment(
   const createdAt = new Date().toISOString();
 
   const processedFiles: HomeworkFile[] = [];
+  const client = getSupabaseClient();
+  const { isConfigured } = getSupabaseCredentials();
 
-  if (isSupabaseConfigured && supabase) {
-    try {
-      // 1. Insert assignment into Supabase table
-      const { data: createdAssignment, error: insertError } = await supabase
-        .from('assignments')
-        .insert({
-          id: generatedId,
-          created_at: createdAt,
-          teacher_name: newAssignment.teacher_name,
-          teacher_phone: newAssignment.teacher_phone,
-          teacher_email: newAssignment.teacher_email,
-          class_grade: newAssignment.class_grade,
-          section: newAssignment.section,
-          subject: newAssignment.subject,
-          title: newAssignment.title,
-          instructions: newAssignment.instructions,
-          due_date: newAssignment.due_date,
-        })
-        .select()
-        .single();
+  let savedToSupabase = false;
 
-      if (insertError) throw insertError;
+  // 1. Process files into durable URLs
+  for (const file of rawFiles) {
+    const fileExt = file.name.split('.').pop() || 'file';
+    const fileId = `file-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
+    let publicUrl = '';
 
-      // 2. Upload files to bucket 'holiday-homework'
-      for (const file of rawFiles) {
-        const fileExt = file.name.split('.').pop() || 'bin';
-        const fileId = `file-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
+    // If Supabase is available, try uploading to bucket
+    if (isConfigured && client) {
+      try {
         const storagePath = `${generatedId}/${fileId}.${fileExt}`;
-
-        let publicUrl = '';
-        const { error: uploadError } = await supabase.storage
+        const { error: uploadError } = await client.storage
           .from('holiday-homework')
           .upload(storagePath, file, { cacheControl: '3600', upsert: true });
 
         if (!uploadError) {
-          const { data: urlData } = supabase.storage
+          const { data: urlData } = client.storage
             .from('holiday-homework')
             .getPublicUrl(storagePath);
           publicUrl = urlData.publicUrl;
-        } else {
-          // Fallback if bucket doesn't exist yet
-          publicUrl = await readFileAsDataUrl(file);
         }
-
-        // Insert into assignment_files table
-        const fileRecord = {
-          id: fileId,
-          assignment_id: generatedId,
-          file_name: file.name,
-          file_size: file.size,
-          file_type: fileExt,
-          storage_path: storagePath,
-          public_url: publicUrl,
-        };
-
-        await supabase.from('assignment_files').insert(fileRecord);
-        processedFiles.push(fileRecord);
+      } catch (e) {
+        console.warn('Supabase bucket upload error, converting to local data URL:', e);
       }
-
-      return {
-        ...newAssignment,
-        id: generatedId,
-        created_at: createdAt,
-        files: processedFiles,
-        is_verified_staff: true,
-      };
-    } catch (err) {
-      console.warn('Supabase upload failed, saving to local storage fallback:', err);
     }
-  }
 
-  // Local storage fallback implementation
-  for (const file of rawFiles) {
-    const fileExt = file.name.split('.').pop() || 'file';
-    const dataUrl = await readFileAsDataUrl(file);
+    // If not in Supabase storage or failed, convert to base64 Data URL for IndexedDB
+    if (!publicUrl) {
+      publicUrl = await readFileAsDataUrl(file);
+    }
+
     processedFiles.push({
-      id: `file-loc-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+      id: fileId,
       assignment_id: generatedId,
       file_name: file.name,
       file_size: file.size,
       file_type: fileExt,
-      public_url: dataUrl,
+      public_url: publicUrl,
     });
   }
 
@@ -182,32 +167,103 @@ export async function saveAssignment(
     is_verified_staff: true,
   };
 
+  // 2. Try inserting assignment record into Supabase cloud table
+  if (isConfigured && client) {
+    try {
+      const { error: insertError } = await client.from('assignments').insert({
+        id: generatedId,
+        created_at: createdAt,
+        teacher_name: newAssignment.teacher_name,
+        teacher_phone: newAssignment.teacher_phone,
+        teacher_email: newAssignment.teacher_email,
+        class_grade: newAssignment.class_grade,
+        section: newAssignment.section,
+        subject: newAssignment.subject,
+        title: newAssignment.title,
+        instructions: newAssignment.instructions,
+        due_date: newAssignment.due_date,
+      });
+
+      if (!insertError) {
+        savedToSupabase = true;
+        // Insert file records into Supabase
+        for (const fileRecord of processedFiles) {
+          await client.from('assignment_files').insert({
+            id: fileRecord.id,
+            assignment_id: generatedId,
+            file_name: fileRecord.file_name,
+            file_size: fileRecord.file_size,
+            file_type: fileRecord.file_type,
+            public_url: fileRecord.public_url,
+          });
+        }
+      } else {
+        console.warn('Supabase assignment insert error:', insertError);
+      }
+    } catch (err) {
+      console.warn('Supabase save error, persisting locally in IndexedDB:', err);
+    }
+  }
+
+  // 3. ALWAYS Save into IndexedDB so it NEVER disappears on page refresh!
   if (typeof window !== 'undefined') {
-    const cached = localStorage.getItem(LOCAL_STORAGE_KEY);
-    let list: Assignment[] = cached ? JSON.parse(cached) : [...INITIAL_MOCK_ASSIGNMENTS];
-    list = [finalAssignment, ...list];
-    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(list));
+    try {
+      await saveAssignmentToIdb(finalAssignment);
+    } catch (err) {
+      console.error('Error saving to IndexedDB:', err);
+    }
+
+    // Also update localStorage safely without quota crash
+    try {
+      const cached = localStorage.getItem(LOCAL_STORAGE_KEY);
+      let list: Assignment[] = cached ? JSON.parse(cached) : [...INITIAL_MOCK_ASSIGNMENTS];
+      // Save metadata to localStorage (without giant data URLs if too big)
+      const sanitizedForLocalStorage = {
+        ...finalAssignment,
+        files: finalAssignment.files.map((f) => ({
+          ...f,
+          public_url: f.public_url.startsWith('data:') && f.public_url.length > 50000
+            ? f.public_url.substring(0, 100) + '...'
+            : f.public_url,
+        })),
+      };
+      list = [sanitizedForLocalStorage, ...list];
+      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(list));
+    } catch (e) {
+      console.warn('localStorage quota reached, IndexedDB is handling full files successfully');
+    }
   }
 
   return finalAssignment;
 }
 
 export async function deleteAssignment(id: string): Promise<boolean> {
-  if (isSupabaseConfigured && supabase) {
+  const client = getSupabaseClient();
+  const { isConfigured } = getSupabaseCredentials();
+
+  if (isConfigured && client) {
     try {
-      await supabase.from('assignment_files').delete().eq('assignment_id', id);
-      await supabase.from('assignments').delete().eq('id', id);
+      await client.from('assignment_files').delete().eq('assignment_id', id);
+      await client.from('assignments').delete().eq('id', id);
     } catch (err) {
       console.error('Supabase delete error:', err);
     }
   }
 
   if (typeof window !== 'undefined') {
-    const cached = localStorage.getItem(LOCAL_STORAGE_KEY);
-    if (cached) {
-      const list: Assignment[] = JSON.parse(cached);
-      const filtered = list.filter((a) => a.id !== id);
-      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(filtered));
+    // Delete from IndexedDB
+    await deleteAssignmentFromIdb(id);
+
+    // Delete from localStorage
+    try {
+      const cached = localStorage.getItem(LOCAL_STORAGE_KEY);
+      if (cached) {
+        const list: Assignment[] = JSON.parse(cached);
+        const filtered = list.filter((a) => a.id !== id);
+        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(filtered));
+      }
+    } catch (e) {
+      // Ignore
     }
   }
   return true;
@@ -218,7 +274,6 @@ function readFileAsDataUrl(file: File): Promise<string> {
     const reader = new FileReader();
     reader.onload = () => resolve(reader.result as string);
     reader.onerror = () => {
-      // Fallback empty data URL
       resolve(`data:application/octet-stream;name=${encodeURIComponent(file.name)},`);
     };
     reader.readAsDataURL(file);

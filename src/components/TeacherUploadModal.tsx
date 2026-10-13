@@ -27,6 +27,8 @@ interface TeacherUploadModalProps {
   onClose: () => void;
   isStaffUnlocked: boolean;
   onUnlockStaff: (pin: string) => boolean;
+  onUnlockAdmin?: (pin: string) => boolean;
+  onOpenAdminDashboard?: () => void;
   onAssignmentCreated: (assignment: Assignment) => void;
   onSwitchToStudentView: () => void;
 }
@@ -51,9 +53,14 @@ export const TeacherUploadModal: React.FC<TeacherUploadModalProps> = ({
   onClose,
   isStaffUnlocked,
   onUnlockStaff,
+  onUnlockAdmin,
+  onOpenAdminDashboard,
   onAssignmentCreated,
   onSwitchToStudentView,
 }) => {
+  // Role selector on auth screen: 'teacher' | 'admin'
+  const [authRole, setAuthRole] = useState<'teacher' | 'admin'>('teacher');
+
   // PIN Form state
   const [pinInput, setPinInput] = useState('');
   const [pinError, setPinError] = useState('');
@@ -89,7 +96,28 @@ export const TeacherUploadModal: React.FC<TeacherUploadModalProps> = ({
   // Handle PIN verification
   const handlePinSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (onUnlockStaff(pinInput)) {
+    const trimmed = pinInput.trim();
+
+    // If Admin mode chosen or Admin PIN entered
+    if (authRole === 'admin' || trimmed === '992026') {
+      if (onUnlockAdmin && onUnlockAdmin(trimmed)) {
+        setPinError('');
+        onClose();
+        if (onOpenAdminDashboard) onOpenAdminDashboard();
+        return;
+      } else if (trimmed === '992026') {
+        setPinError('');
+        onClose();
+        if (onOpenAdminDashboard) onOpenAdminDashboard();
+        return;
+      } else {
+        setPinError('Invalid Admin PIN. Access denied.');
+        return;
+      }
+    }
+
+    // Teacher mode (or default)
+    if (onUnlockStaff(trimmed)) {
       setPinError('');
     } else {
       setPinError('Invalid Teacher PIN. Access denied.');
@@ -212,16 +240,61 @@ export const TeacherUploadModal: React.FC<TeacherUploadModalProps> = ({
 
         {/* Modal Body: If Locked vs Unlocked */}
         {!isStaffUnlocked ? (
-          /* TEACHER PIN LOGIN STEP */
-          <div className="p-6 sm:p-10 text-center max-w-md mx-auto space-y-5">
-            <div className="w-16 h-16 rounded-3xl bg-amber-100 text-amber-800 flex items-center justify-center mx-auto border border-amber-300 shadow-inner">
-              <Lock className="w-8 h-8 text-amber-700" />
+          /* ROLE-BASED AUTHENTICATION STEP */
+          <div className="p-6 sm:p-8 max-w-lg mx-auto space-y-5">
+            {/* Role Switcher Pill Bar */}
+            <div className="flex items-center p-1 bg-amber-100/80 rounded-2xl border border-amber-300">
+              <button
+                type="button"
+                onClick={() => {
+                  setAuthRole('teacher');
+                  setPinError('');
+                  setPinInput('');
+                }}
+                className={`flex-1 flex items-center justify-center space-x-2 py-2.5 rounded-xl text-xs font-black transition-all ${
+                  authRole === 'teacher'
+                    ? 'bg-amber-800 text-white shadow-md'
+                    : 'text-amber-950 hover:bg-white/50'
+                }`}
+              >
+                <GraduationCap className="w-4 h-4" />
+                <span>Teacher (Upload Homework)</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setAuthRole('admin');
+                  setPinError('');
+                  setPinInput('');
+                }}
+                className={`flex-1 flex items-center justify-center space-x-2 py-2.5 rounded-xl text-xs font-black transition-all ${
+                  authRole === 'admin'
+                    ? 'bg-rose-800 text-white shadow-md'
+                    : 'text-rose-950 hover:bg-white/50'
+                }`}
+              >
+                <ShieldCheck className="w-4 h-4" />
+                <span>Admin (Dashboard & Cloud Sync)</span>
+              </button>
             </div>
 
-            <div>
-              <h4 className="text-xl font-black text-slate-900">Teacher Staff Authentication</h4>
-              <p className="text-xs text-slate-600 mt-1 font-medium">
-                Please enter the Teacher Security PIN to access the homework upload form.
+            <div className="text-center space-y-2">
+              <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mx-auto border shadow-inner ${
+                authRole === 'teacher'
+                  ? 'bg-amber-100 text-amber-800 border-amber-300'
+                  : 'bg-rose-100 text-rose-800 border-rose-300'
+              }`}>
+                <Lock className="w-7 h-7" />
+              </div>
+
+              <h4 className="text-lg font-black text-slate-900">
+                {authRole === 'teacher' ? 'Teacher Staff Access' : 'Administrator Control & Cloud Setup'}
+              </h4>
+              <p className="text-xs text-slate-600 font-medium leading-relaxed">
+                {authRole === 'teacher'
+                  ? 'Enter the Teacher PIN to unlock the holiday homework submission form.'
+                  : 'Enter the Admin PIN to access deletions, pending assignments tracker, and Cloud Database (Supabase) settings.'}
               </p>
             </div>
 
@@ -232,8 +305,12 @@ export const TeacherUploadModal: React.FC<TeacherUploadModalProps> = ({
                   maxLength={6}
                   value={pinInput}
                   onChange={(e) => setPinInput(e.target.value)}
-                  placeholder="Enter Security PIN"
-                  className="w-full text-center text-2xl tracking-[0.4em] font-mono py-3 bg-white border border-amber-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-amber-500 font-bold"
+                  placeholder={authRole === 'teacher' ? 'Enter Teacher PIN' : 'Enter Admin PIN'}
+                  className={`w-full text-center text-2xl tracking-[0.4em] font-mono py-3 bg-white border rounded-2xl focus:outline-none focus:ring-2 font-bold ${
+                    authRole === 'teacher'
+                      ? 'border-amber-300 focus:ring-amber-500'
+                      : 'border-rose-300 focus:ring-rose-500'
+                  }`}
                   autoFocus
                 />
                 {pinError && (
@@ -246,10 +323,16 @@ export const TeacherUploadModal: React.FC<TeacherUploadModalProps> = ({
 
               <button
                 type="submit"
-                className="w-full bg-gradient-to-r from-amber-700 to-orange-600 hover:from-amber-800 hover:to-orange-700 text-white font-black py-3 rounded-2xl shadow-md transition-all text-sm flex items-center justify-center space-x-2"
+                className={`w-full text-white font-black py-3 rounded-2xl shadow-md transition-all text-sm flex items-center justify-center space-x-2 ${
+                  authRole === 'teacher'
+                    ? 'bg-gradient-to-r from-amber-700 to-orange-600 hover:from-amber-800 hover:to-orange-700'
+                    : 'bg-gradient-to-r from-rose-700 to-rose-900 hover:from-rose-800 hover:to-rose-950'
+                }`}
               >
                 <Unlock className="w-4 h-4" />
-                <span>Verify & Continue</span>
+                <span>
+                  {authRole === 'teacher' ? 'Verify & Open Upload Form' : 'Unlock Admin Dashboard & Cloud Sync'}
+                </span>
               </button>
             </form>
           </div>

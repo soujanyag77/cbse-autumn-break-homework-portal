@@ -12,6 +12,7 @@ import {
   School,
   FileCode2,
   ShieldCheck,
+  Cloud,
 } from 'lucide-react';
 
 interface NavbarProps {
@@ -118,6 +119,15 @@ export const Navbar: React.FC<NavbarProps> = ({
 
           {/* Right Action Tools */}
           <div className="flex items-center space-x-2 sm:space-x-3">
+            {/* Direct Admin & Cloud Button */}
+            <button
+              onClick={onOpenAdminDashboard}
+              title="Admin Dashboard & Supabase Cloud Sync (PIN: 992026)"
+              className="flex items-center space-x-1.5 bg-rose-50 hover:bg-rose-100 text-rose-800 border border-rose-300 px-3 py-2 rounded-xl text-xs font-bold transition-all shadow-xs"
+            >
+              <ShieldCheck className="w-3.5 h-3.5 text-rose-600" />
+              <span className="hidden sm:inline">Admin & Cloud</span>
+            </button>
 
             {/* Print Action */}
             <button
@@ -140,29 +150,37 @@ export const Navbar: React.FC<NavbarProps> = ({
         </div>
 
         {/* Mobile Tab Switcher */}
-        <div className="flex md:hidden items-center justify-around py-2 border-t border-amber-200/60 bg-amber-50/50">
+        <div className="flex md:hidden items-center justify-around py-2 border-t border-amber-200/60 bg-amber-50/50 gap-1 px-1">
           <button
             onClick={() => setActiveTab('student')}
-            className={`flex-1 flex items-center justify-center space-x-1.5 py-2 rounded-xl text-xs font-bold transition-all ${
+            className={`flex-1 flex items-center justify-center space-x-1 py-2 rounded-xl text-[11px] font-bold transition-all ${
               activeTab === 'student'
                 ? 'bg-white text-amber-900 shadow-sm border border-amber-200'
                 : 'text-slate-600'
             }`}
           >
-            <BookOpenCheck className="w-4 h-4 text-amber-600" />
-            <span>Student Board ({totalAssignmentsCount})</span>
+            <BookOpenCheck className="w-3.5 h-3.5 text-amber-600" />
+            <span>Student ({totalAssignmentsCount})</span>
           </button>
 
           <button
             onClick={handleTeacherTabClick}
-            className={`flex-1 flex items-center justify-center space-x-1.5 py-2 rounded-xl text-xs font-bold transition-all ${
+            className={`flex-1 flex items-center justify-center space-x-1 py-2 rounded-xl text-[11px] font-bold transition-all ${
               activeTab === 'teacher'
                 ? 'bg-amber-700 text-white shadow-sm'
                 : 'text-slate-600'
             }`}
           >
-            <GraduationCap className="w-4 h-4" />
-            <span>Teacher Upload</span>
+            <GraduationCap className="w-3.5 h-3.5" />
+            <span>Teacher</span>
+          </button>
+
+          <button
+            onClick={onOpenAdminDashboard}
+            className="flex-1 flex items-center justify-center space-x-1 py-2 rounded-xl text-[11px] font-bold transition-all bg-rose-50 text-rose-900 border border-rose-200 shadow-xs"
+          >
+            <ShieldCheck className="w-3.5 h-3.5 text-rose-700" />
+            <span>Admin</span>
           </button>
         </div>
 

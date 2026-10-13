@@ -3,10 +3,11 @@ import { Leaf, GraduationCap, School, Heart, ShieldCheck, HelpCircle } from 'luc
 
 interface FooterProps {
   onOpenTeacherRoom: () => void;
+  onOpenAdminDashboard: () => void;
   onOpenSchemaModal: () => void;
 }
 
-export const Footer: React.FC<FooterProps> = ({ onOpenTeacherRoom, onOpenSchemaModal }) => {
+export const Footer: React.FC<FooterProps> = ({ onOpenTeacherRoom, onOpenAdminDashboard, onOpenSchemaModal }) => {
   return (
     <footer className="bg-slate-900 text-amber-100/90 border-t-4 border-amber-600 pt-10 pb-8 mt-16">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -53,8 +54,13 @@ export const Footer: React.FC<FooterProps> = ({ onOpenTeacherRoom, onOpenSchemaM
                 </button>
               </li>
               <li>
+                <button onClick={onOpenAdminDashboard} className="hover:text-rose-400 text-rose-300 font-bold transition-colors text-left flex items-center gap-1">
+                  • Admin Dashboard & Cloud Sync (PIN: 992026)
+                </button>
+              </li>
+              <li>
                 <button onClick={onOpenSchemaModal} className="hover:text-amber-400 transition-colors text-left">
-                  • Supabase Database & Integration
+                  • Supabase Database & SQL Setup
                 </button>
               </li>
               <li>
