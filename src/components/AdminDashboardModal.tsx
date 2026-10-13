@@ -24,7 +24,7 @@ import {
 } from 'lucide-react';
 import { Assignment, GradeLevel, ACADEMIC_STAGES, SUBJECTS_BY_STAGE, getStageForClass } from '@/types/homework';
 import { SubjectIcon, getSubjectTheme } from './SubjectIcon';
-import { getSupabaseCredentials, saveSupabaseCredentials, getSupabaseClient } from '@/lib/supabase';
+import { getSupabaseCredentials, saveSupabaseCredentials, getSupabaseClient, testSupabaseConnection } from '@/lib/supabase';
 
 interface AdminDashboardModalProps {
   isOpen: boolean;
@@ -55,18 +55,52 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
   // Cloud Config state
   const [cloudUrl, setCloudUrl] = useState('');
   const [cloudKey, setCloudKey] = useState('');
-  const [cloudStatus, setCloudStatus] = useState<{ isConfigured: boolean }>({ isConfigured: false });
+  const [cloudStatus, setCloudStatus] = useState<{ isConfigured: boolean; isFromEnv: boolean }>({
+    isConfigured: false,
+    isFromEnv: false,
+  });
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [copiedSql, setCopiedSql] = useState(false);
+  const [isTesting, setIsTesting] = useState(false);
+  const [testResult, setTestResult] = useState<{
+    tested: boolean;
+    success: boolean;
+    message: string;
+    tableOk: boolean;
+    bucketOk: boolean;
+  } | null>(null);
 
   useEffect(() => {
     if (isOpen) {
       const creds = getSupabaseCredentials();
       setCloudUrl(creds.url);
       setCloudKey(creds.key);
-      setCloudStatus({ isConfigured: creds.isConfigured });
+      setCloudStatus({ isConfigured: creds.isConfigured, isFromEnv: creds.isFromEnv });
+      setTestResult(null);
     }
   }, [isOpen]);
+
+  const handleTestConnection = async () => {
+    setIsTesting(true);
+    setTestResult(null);
+    try {
+      const result = await testSupabaseConnection();
+      setTestResult({
+        tested: true,
+        ...result,
+      });
+    } catch (e: any) {
+      setTestResult({
+        tested: true,
+        success: false,
+        message: e.message || 'Connection test failed',
+        tableOk: false,
+        bucketOk: false,
+      });
+    } finally {
+      setIsTesting(false);
+    }
+  };
 
   if (!isOpen) return null;
 
@@ -121,9 +155,10 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
     e.preventDefault();
     saveSupabaseCredentials(cloudUrl, cloudKey);
     const creds = getSupabaseCredentials();
-    setCloudStatus({ isConfigured: creds.isConfigured });
+    setCloudStatus({ isConfigured: creds.isConfigured, isFromEnv: creds.isFromEnv });
     setSaveSuccess(true);
     setTimeout(() => setSaveSuccess(false), 3000);
+    handleTestConnection();
   };
 
   const sqlCode = `-- Supabase SQL Schema for CBSE Autumn Break Portal
@@ -427,7 +462,9 @@ ON CONFLICT (id) DO NOTHING;
 
           {/* TAB 3: CLOUD DATABASE SETTINGS (SUPABASE) */}
           {activeTab === 'cloud' && (
-            <div className="max-h-[50vh] overflow-y-auto space-y-4 pr-1">
+            <div className="max-h-[52vh] overflow-y-auto space-y-4 pr-1">
+              
+              {/* Status Header */}
               <div className={`p-4 rounded-2xl border ${
                 cloudStatus.isConfigured
                   ? 'bg-emerald-50 border-emerald-300 text-emerald-900'
@@ -437,27 +474,52 @@ ON CONFLICT (id) DO NOTHING;
                   {cloudStatus.isConfigured ? (
                     <>
                       <CheckCircle2 className="w-5 h-5 text-emerald-600" />
-                      <span>Cloud Database Connected (Available to All Devices)</span>
+                      <span>Cloud Database Configured {cloudStatus.isFromEnv ? '(via Vercel Environment)' : '(via Current Browser)'}</span>
                     </>
                   ) : (
                     <>
                       <AlertTriangle className="w-5 h-5 text-amber-700" />
-                      <span>Local IndexedDB Active (Connect Supabase to share across all parents & students)</span>
+                      <span>Local Storage Mode Active (Uploads only saved on this browser)</span>
                     </>
                   )}
                 </div>
                 <p className="text-xs mt-1 font-medium leading-relaxed">
                   {cloudStatus.isConfigured
-                    ? 'All assignments and uploaded worksheets are automatically synced to Supabase Cloud so any parent, student, or teacher on any computer or phone sees uploads anytime!'
-                    : 'Uploads are currently saved in your browser’s permanent IndexedDB (they will survive refresh on this device). To make uploads accessible to every student and parent on their phones and computers, connect your free Supabase project below.'}
+                    ? 'Your Supabase credentials are set. Use the "Test Live Connection" button below to confirm that both your database table and storage bucket are active.'
+                    : 'Uploads are currently stored in this browser only. To make uploads visible to everyone across all phones and browsers, connect Supabase below.'}
                 </p>
+              </div>
+
+              {/* Crucial Guide: Why other browsers don't see uploads */}
+              <div className="bg-sky-50 border border-sky-300 rounded-2xl p-4 space-y-2 text-xs text-sky-950">
+                <h4 className="font-black text-sky-900 flex items-center gap-1.5 text-sm">
+                  <ExternalLink className="w-4 h-4 text-sky-700" />
+                  Why do other browsers/devices not see uploads yet?
+                </h4>
+                <p className="leading-relaxed">
+                  Web browsers have separate, isolated offline storage. Saving credentials in this popup connects <strong>this browser</strong>, but to make uploads appear automatically on <strong>every student&apos;s and parent&apos;s phone and laptop without them having to configure anything</strong>:
+                </p>
+                <div className="bg-white/80 p-3 rounded-xl border border-sky-200 space-y-1.5 font-medium">
+                  <div className="font-bold text-sky-900">3-Step Checklist for All Devices:</div>
+                  <ol className="list-decimal list-inside space-y-1 text-slate-800">
+                    <li>Create your free project at <a href="https://supabase.com" target="_blank" rel="noopener noreferrer" className="text-sky-700 underline font-bold">supabase.com</a> and run the SQL script below in the SQL Editor.</li>
+                    <li>Go to your <strong>Vercel Dashboard</strong> ➔ Your Project ➔ <strong>Settings</strong> ➔ <strong>Environment Variables</strong>.</li>
+                    <li>Add:
+                      <div className="mt-1 font-mono text-[11px] bg-slate-900 text-amber-200 p-2 rounded-lg">
+                        NEXT_PUBLIC_SUPABASE_URL = your-supabase-project-url<br/>
+                        NEXT_PUBLIC_SUPABASE_ANON_KEY = your-anon-public-key
+                      </div>
+                    </li>
+                    <li>In Vercel, go to <strong>Deployments</strong> ➔ Click the three dots ➔ <strong>Redeploy</strong>. Once redeployed, every browser and phone on earth will automatically see all uploaded files!</li>
+                  </ol>
+                </div>
               </div>
 
               {/* Form to paste Supabase credentials */}
               <form onSubmit={handleSaveCloudSettings} className="bg-white p-5 rounded-2xl border border-amber-200 space-y-3">
                 <h4 className="text-xs font-black uppercase tracking-wider text-slate-900 flex items-center gap-1.5">
                   <Database className="w-4 h-4 text-emerald-700" />
-                  Supabase Cloud Credentials
+                  Supabase Cloud Credentials (This Device)
                 </h4>
 
                 <div className="space-y-2">
@@ -488,27 +550,70 @@ ON CONFLICT (id) DO NOTHING;
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between pt-2">
-                  {saveSuccess && (
-                    <span className="text-xs font-bold text-emerald-700 flex items-center gap-1">
-                      <Check className="w-4 h-4" /> Cloud Credentials Saved & Connected!
-                    </span>
-                  )}
-                  {!saveSuccess && <span></span>}
+                <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-amber-100">
+                  <div className="flex items-center space-x-2">
+                    <button
+                      type="button"
+                      onClick={handleTestConnection}
+                      disabled={isTesting || !cloudUrl.trim() || !cloudKey.trim()}
+                      className="bg-sky-700 hover:bg-sky-800 text-white font-bold px-3.5 py-2 rounded-xl text-xs shadow-sm transition-all disabled:opacity-50 flex items-center space-x-1"
+                    >
+                      {isTesting ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Database className="w-3.5 h-3.5" />}
+                      <span>{isTesting ? 'Testing...' : 'Test Live Connection'}</span>
+                    </button>
+
+                    {saveSuccess && (
+                      <span className="text-xs font-bold text-emerald-700 flex items-center gap-1">
+                        <Check className="w-4 h-4" /> Saved!
+                      </span>
+                    )}
+                  </div>
 
                   <button
                     type="submit"
-                    className="bg-emerald-700 hover:bg-emerald-800 text-white font-bold px-4 py-2 rounded-xl text-xs shadow-md transition-all"
+                    className="bg-emerald-700 hover:bg-emerald-800 text-white font-bold px-4 py-2 rounded-xl text-xs shadow-md transition-all cursor-pointer"
                   >
                     Save & Connect Cloud
                   </button>
                 </div>
+
+                {/* Test Results Card */}
+                {testResult && (
+                  <div className={`mt-3 p-3 rounded-xl border text-xs leading-relaxed ${
+                    testResult.success
+                      ? 'bg-emerald-50 border-emerald-300 text-emerald-900'
+                      : 'bg-rose-50 border-rose-300 text-rose-900'
+                  }`}>
+                    <div className="font-bold flex items-center gap-1.5 mb-1">
+                      {testResult.success ? (
+                        <>
+                          <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                          <span>Connection Test Passed!</span>
+                        </>
+                      ) : (
+                        <>
+                          <AlertTriangle className="w-4 h-4 text-rose-600" />
+                          <span>Connection Test Failed:</span>
+                        </>
+                      )}
+                    </div>
+                    <p className="font-medium text-[11px] mb-2">{testResult.message}</p>
+                    <div className="flex flex-wrap items-center gap-3 font-semibold text-[11px]">
+                      <span className={testResult.tableOk ? 'text-emerald-700' : 'text-rose-700'}>
+                        Table &apos;assignments&apos;: {testResult.tableOk ? '✓ Found' : '✗ Missing'}
+                      </span>
+                      <span className={testResult.bucketOk ? 'text-emerald-700' : 'text-rose-700'}>
+                        Bucket &apos;holiday-homework&apos;: {testResult.bucketOk ? '✓ Found' : '✗ Missing'}
+                      </span>
+                    </div>
+                  </div>
+                )}
               </form>
 
               {/* SQL Script Quick Copy */}
               <div className="bg-slate-900 text-white p-4 rounded-2xl space-y-2">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-amber-300">Supabase SQL Editor Setup:</span>
+                  <span className="text-xs font-bold text-amber-300">Supabase SQL Editor Script:</span>
                   <button
                     onClick={copySql}
                     className="flex items-center space-x-1 bg-amber-600 hover:bg-amber-700 text-white text-[11px] font-bold px-2.5 py-1 rounded-lg"
